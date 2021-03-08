@@ -1,0 +1,2 @@
+newstr = "Hello World"
+print(newstr)
