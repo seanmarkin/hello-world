@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Coding Agent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- The Octokit script will now be loaded via an import statement in the script below -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-2xl">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-white">GitHub Coding Agent</h1>
+                <p class="text-gray-500 dark:text-gray-400 mt-2">Create a new file in your GitHub repository.</p>
+            </div>
+
+            <form id="github-form" class="space-y-6">
+                <div>
+                    <label for="token" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Personal Access Token</label>
+                    <input type="password" id="token" class="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="ghp_...">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                        <label for="owner" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Repository Owner</label>
+                        <input type="text" id="owner" class="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="e.g., octocat">
+                    </div>
+                    <div>
+                        <label for="repo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Repository Name</label>
+                        <input type="text" id="repo" class="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="e.g., Hello-World">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="path" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">File Path</label>
+                    <input type="text" id="path" class="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="e.g., src/components/NewFile.js">
+                </div>
+
+                <div>
+                    <label for="branch" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Branch</label>
+                    <input type="text" id="branch" class="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="e.g., main or a new-feature-branch">
+                </div>
+
+                <div>
+                    <label for="content" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">File Content</label>
+                    <textarea id="content" rows="6" class="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="console.log('Hello, World!');"></textarea>
+                </div>
+
+                <div>
+                    <label for="message" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Commit Message</label>
+                    <input type="text" id="message" class="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="e.g., feat: Add new file">
+                </div>
+
+                <button type="submit" id="submit-btn" class="w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 transition-all duration-300 ease-in-out flex items-center justify-center">
+                    <span id="btn-text">Create File</span>
+                    <svg id="spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+            </form>
+
+            <div id="message-box" class="mt-6 text-center p-4 rounded-lg hidden"></div>
+        </div>
+    </div>
+
+    <!-- Changed to a module to allow for reliable import -->
+    <script type="module">
+        // Import Octokit reliably using ES Modules
+        import { Octokit } from "https://esm.sh/octokit";
+
+        document.getElementById('github-form').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const token = document.getElementById('token').value;
+            const owner = document.getElementById('owner').value;
+            const repo = document.getElementById('repo').value;
+            const path = document.getElementById('path').value;
+            const content = document.getElementById('content').value;
+            const message = document.getElementById('message').value;
+            const branch = document.getElementById('branch').value;
+            
+            const submitBtn = document.getElementById('submit-btn');
+            const btnText = document.getElementById('btn-text');
+            const spinner = document.getElementById('spinner');
+            const messageBox = document.getElementById('message-box');
+
+            // --- Basic validation ---
+            if (!token || !owner || !repo || !path || !content || !message || !branch) {
+                showMessage('Please fill out all fields.', 'error');
+                return;
+            }
+
+            // --- UI loading state ---
+            submitBtn.disabled = true;
+            btnText.textContent = 'Creating...';
+            spinner.classList.remove('hidden');
+            messageBox.classList.add('hidden');
+
+            try {
+                // --- Initialize Octokit ---
+                const octokit = new Octokit({ auth: token });
+
+                // --- Base64 encode the content ---
+                const encodedContent = btoa(unescape(encodeURIComponent(content)));
+
+                // --- Make the API request ---
+                const response = await octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
+                    owner,
+                    repo,
+                    path,
+                    message,
+                    content: encodedContent,
+                    branch,
+                    headers: {
+                      'X-GitHub-Api-Version': '2022-11-28'
+                    }
+                });
+
+                if (response.status === 201) {
+                    const fileUrl = response.data.content.html_url;
+                    showMessage(`File created successfully! <a href="${fileUrl}" target="_blank" class="font-semibold underline hover:text-green-700 dark:hover:text-green-300">View on GitHub</a>`, 'success');
+                } else {
+                    showMessage(`An unexpected status was returned: ${response.status}`, 'error');
+                }
+
+            } catch (error) {
+                console.error(error);
+                let errorMessage = 'An error occurred.';
+                if (error.status === 404) {
+                    errorMessage = 'Repository not found. Check owner/repo name.';
+                } else if (error.status === 401) {
+                    errorMessage = 'Authentication failed. Check your token.';
+                } else if (error.status === 422) {
+                    errorMessage = 'Validation failed. The file might already exist on this branch, or the branch may not exist.';
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+                showMessage(errorMessage, 'error');
+            } finally {
+                // --- Reset UI state ---
+                submitBtn.disabled = false;
+                btnText.textContent = 'Create File';
+                spinner.classList.add('hidden');
+            }
+        });
+
+        function showMessage(text, type) {
+            const messageBox = document.getElementById('message-box');
+            messageBox.innerHTML = text;
+            messageBox.className = 'mt-6 text-center p-4 rounded-lg'; // Reset classes
+            if (type === 'success') {
+                messageBox.classList.add('bg-green-100', 'dark:bg-green-900', 'text-green-800', 'dark:text-green-200');
+            } else {
+                messageBox.classList.add('bg-red-100', 'dark:bg-red-900', 'text-red-800', 'dark:text-red-200');
+            }
+            messageBox.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
